@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galcutta – MGA Fourball 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Cormorant+Garamond:wght@300;400;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, collection, serverTimestamp, query, orderBy, limit, getDocs }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ─────────────────────────────────────────────────────────────
+//  🔧 PASTE YOUR FIREBASE CONFIG HERE
+//  (Replace these placeholder values after creating your project)
+// ─────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:            "AIzaSyCPd8nAN_V6UrA8897mIlh77madGY4w9yE",
+  authDomain:        "galcutta-cf37b.firebaseapp.com",
+  projectId:         "galcutta-cf37b",
+  storageBucket:     "galcutta-cf37b.firebasestorage.app",
+  messagingSenderId: "708427446926",
+  appId:             "1:708427446926:web:b063a5b25d046188e867df"
+};
+
+const HOST_PASSWORD = "galcutta2026";  // Change this to your host password
+
+// ─────────────────────────────────────────────────────────────
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ── TEAM DATA ────────────────────────────────────────────────
+const FLIGHTS = {
+  A: [
+    { id:"A1", p1:"Doug Bishop",       p2:"Chase Phillips",       tee:"7:50 AM · 1A" },
+    { id:"A2", p1:"Damon Weddington",  p2:"Tiger Greene",         tee:"7:50 AM · 1B" },
+    { id:"A3", p1:"John Ulecki",       p2:"Mark Backus",          tee:"8:00 AM · 1A" },
+    { id:"A4", p1:"Adam Wittan",       p2:"Jonathan Cory Marcus", tee:"8:00 AM · 1B" },
+    { id:"A5", p1:"Mark Sphar",        p2:"Steve Thomas",         tee:"8:10 AM · 1A" },
+    { id:"A6", p1:"Dean Robertson",    p2:"Kyle Bowman",          tee:"8:10 AM · 1B" },
+    { id:"A7", p1:"Jim Broadway Jr.",  p2:"Jim Broadway",         tee:"8:20 AM · 1"  },
+  ],
+  B: [
+    { id:"B1", p1:"David Thomson",     p2:"George Connolly",      tee:"8:30 AM · 1" },
+    { id:"B2", p1:"Mike Morgan",       p2:"Cornelius Donnelly",   tee:"8:30 AM · 1" },
+    { id:"B3", p1:"Jack Geis",         p2:"Mike Wylie",           tee:"8:40 AM · 1" },
+    { id:"B4", p1:"Paul Marotta",      p2:"Michael Sewak",        tee:"8:40 AM · 1" },
+    { id:"B5", p1:"Tim Fechalos",      p2:"Neal Redman",          tee:"8:50 AM · 1" },
+    { id:"B6", p1:"Jason Shockley",    p2:"Gilad Kochman",        tee:"8:50 AM · 1" },
+  ],
+  C: [
+    { id:"C1", p1:"Matthew Qualman",   p2:"David Winters",        tee:"9:00 AM · 1" },
+    { id:"C2", p1:"Dave Gardner",      p2:"Jaques Mostert",       tee:"9:00 AM · 1" },
+    { id:"C3", p1:"Matthew Beam",      p2:"Tyler Dortch",         tee:"9:10 AM · 1" },
+    { id:"C4", p1:"Jay Pittroff",      p2:"Kevin Filliater",      tee:"9:10 AM · 1" },
+    { id:"C5", p1:"Brad Methvin",      p2:"Rodney Lanxton",       tee:"9:20 AM · 1" },
+    { id:"C6", p1:"Danny Broadway",    p2:"Keith Edwards",        tee:"9:20 AM · 1" },
+  ],
+  D: [
+    { id:"D1", p1:"Alan Boyles",       p2:"David Finnis",         tee:"9:30 AM · 1" },
+    { id:"D2", p1:"Austin Layton",     p2:"Brandon Denton",       tee:"9:30 AM · 1" },
+    { id:"D3", p1:"Brandon Scott",     p2:"Trey Chancellor",      tee:"9:40 AM · 1" },
+    { id:"D4", p1:"Danny Corona",      p2:"Christian Caspersen",  tee:"9:40 AM · 1" },
+    { id:"D5", p1:"Wes Brooker",       p2:"Sean Hyslop",          tee:"9:50 AM · 1" },
+    { id:"D6", p1:"Matthew Beck",      p2:"Allen Eager",          tee:"9:50 AM · 1" },
+  ]
+};
+const ALL_TEAMS = Object.values(FLIGHTS).flat();
+const FLIGHT_COLORS = { A:"#C9A84C", B:"#7EB8A4", C:"#A47EB8", D:"#E88C6A" };
+const TIMER_SEC = 30;
+
+// ── STATE ────────────────────────────────────────────────────
+let currentUser = null;
+let isHost = false;
+let auctionState = null;  // live from Firestore
+let timerInterval = null;
+let timerVal = TIMER_SEC;
+let unsubAuction = null;
+
+// ── HELPERS ──────────────────────────────────────────────────
+function shuffle(arr) {
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+function teamById(id) { return ALL_TEAMS.find(t=>t.id===id); }
+function flightOf(id) { return id ? id[0] : 'A'; }
+function fmtMoney(n) { return n ? `$${n.toLocaleString()}` : '—'; }
+function showToast(title, msg, duration=3500) {
+  const t=document.getElementById('toast');
+  document.getElementById('toastTitle').textContent=title;
+  document.getElementById('toastMsg').textContent=msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTO);
+  window._toastTO=setTimeout(()=>t.classList.remove('show'),duration);
+}
+function show(id){ document.getElementById(id).style.display=''; }
+function hide(id){ document.getElementById(id).style.display='none'; }
+
+// ── AUTH ─────────────────────────────────────────────────────
+window.showRegister = function() { hide('authLogin'); show('authRegister'); }
+window.showLogin    = function() { hide('authRegister'); show('authLogin'); }
+
+window.doRegister = async function() {
+  const name  = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pass  = document.getElementById('regPass').value;
+  const err   = document.getElementById('regErr');
+  if(!name||!email||!pass){ err.textContent='Please fill in all fields.'; return; }
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(cred.user, { displayName: name });
+    // Save user record
+    await setDoc(doc(db,'users',cred.user.uid), { name, email, joinedAt: serverTimestamp() });
+    err.textContent='';
+  } catch(e) {
+    err.textContent = e.message.replace('Firebase: ','').replace(/\(auth.*\)/,'');
+  }
+}
+
+window.doLogin = async function() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  const err   = document.getElementById('loginErr');
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    err.textContent='';
+  } catch(e) {
+    err.textContent = 'Invalid email or password.';
+  }
+}
+
+window.doLogout = async function() {
+  await signOut(auth);
+}
+
+// ── AUTH STATE ───────────────────────────────────────────────
+onAuthStateChanged(auth, async user => {
+  currentUser = user;
+  if (user) {
+    hide('authScreen');
+    show('appScreen');
+    document.getElementById('userName').textContent = user.displayName || user.email;
+    subscribeAuction();
+  } else {
+    show('authScreen');
+    hide('appScreen');
+    if (unsubAuction) { unsubAuction(); unsubAuction=null; }
+    clearInterval(timerInterval);
+  }
+});
+
+// ── HOST AUTH ────────────────────────────────────────────────
+window.activateHost = function() {
+  const pw = document.getElementById('hostPw').value;
+  if (pw === HOST_PASSWORD) {
+    isHost = true;
+    hide('hostLoginPanel');
+    show('hostControls');
+    showToast("Host Mode Active", "You now control the auction.");
+  } else {
+    document.getElementById('hostPwErr').textContent = 'Incorrect password.';
+  }
+}
+
+// ── FIRESTORE AUCTION SUBSCRIPTION ──────────────────────────
+function subscribeAuction() {
+  if (unsubAuction) unsubAuction();
+  unsubAuction = onSnapshot(doc(db,'auction','state'), snap => {
+    if (!snap.exists()) {
+      // No auction initialized yet
+      renderWaiting();
+      return;
+    }
+    const prev = auctionState;
+    auctionState = snap.data();
+    renderAuction(prev);
+  });
+}
+
+// ── HOST: INIT AUCTION ────────────────────────────────────────
+window.hostInitAuction = async function() {
+  const order = shuffle(ALL_TEAMS).map(t=>t.id);
+  const first = order[0];
+  await setDoc(doc(db,'auction','state'), {
+    status: 'active',
+    currentTeamId: first,
+    queue: order.slice(1),
+    currentBid: 0,
+    currentBidder: '',
+    currentBidderId: '',
+    soldTeams: {},
+    timerEnd: Date.now() + TIMER_SEC*1000,
+    startedAt: serverTimestamp()
+  });
+  showToast("Auction Started!", "All 25 teams randomized across flights.");
+}
+
+window.hostNextTeam = async function() {
+  if (!auctionState) return;
+  const { currentTeamId, currentBid, currentBidder, currentBidderId, queue, soldTeams } = auctionState;
+  const newSold = { ...soldTeams };
+  if (currentTeamId) {
+    newSold[currentTeamId] = { price: currentBid, buyer: currentBidder, buyerId: currentBidderId };
+  }
+  if (!queue || queue.length === 0) {
+    await updateDoc(doc(db,'auction','state'), { status:'complete', soldTeams: newSold });
+    return;
+  }
+  const nextId = queue[0];
+  await updateDoc(doc(db,'auction','state'), {
+    currentTeamId: nextId,
+    queue: queue.slice(1),
+    currentBid: 0,
+    currentBidder: '',
+    currentBidderId: '',
+    soldTeams: newSold,
+    timerEnd: Date.now() + TIMER_SEC*1000
+  });
+}
+
+window.hostResetTimer = async function() {
+  await updateDoc(doc(db,'auction','state'), { timerEnd: Date.now() + TIMER_SEC*1000 });
+  showToast("Timer Reset","30 seconds back on the clock.");
+}
+
+window.hostSkipTeam = async function() {
+  if(!auctionState) return;
+  const { currentTeamId, queue } = auctionState;
+  const newQueue = [...(queue||[]), currentTeamId].filter(Boolean);
+  const nextId = newQueue[0];
+  await updateDoc(doc(db,'auction','state'), {
+    currentTeamId: nextId,
+    queue: newQueue.slice(1),
+    currentBid: 0,
+    currentBidder: '',
+    currentBidderId: '',
+    timerEnd: Date.now() + TIMER_SEC*1000
+  });
+  showToast("Team Skipped","Moved to end of queue.");
+}
+
+// ── BIDDING ──────────────────────────────────────────────────
+window.placeBid = async function() {
+  if (!currentUser || !auctionState || auctionState.status !== 'active') return;
+  const { currentBid, currentBidderId } = auctionState;
+  if (currentBidderId === currentUser.uid) { showToast("You're already winning!", "Wait for someone else to bid."); return; }
+  const next = getNextBid(currentBid);
+  try {
+    await updateDoc(doc(db,'auction','state'), {
+      currentBid: next,
+      currentBidder: currentUser.displayName || currentUser.email,
+      currentBidderId: currentUser.uid,
+      timerEnd: Date.now() + TIMER_SEC*1000
+    });
+    // Log bid to history
+    const bidRef = doc(collection(db,'auction','state','bids'));
+    await setDoc(bidRef, {
+      teamId: auctionState.currentTeamId,
+      amount: next,
+      bidder: currentUser.displayName || currentUser.email,
+      bidderId: currentUser.uid,
+      at: serverTimestamp()
+    });
+  } catch(e) { showToast("Bid failed", e.message); }
+}
+
+window.placeQuickBid = async function(amount) {
+  if (!currentUser || !auctionState || auctionState.status !== 'active') return;
+  const { currentBid, currentBidderId } = auctionState;
+  if (currentBidderId === currentUser.uid) { showToast("You're already winning!", "Wait for someone else to bid."); return; }
+  if (amount <= currentBid) { showToast("Too low!", `Current bid is $${currentBid}`); return; }
+  try {
+    await updateDoc(doc(db,'auction','state'), {
+      currentBid: amount,
+      currentBidder: currentUser.displayName || currentUser.email,
+      currentBidderId: currentUser.uid,
+      timerEnd: Date.now() + TIMER_SEC*1000
+    });
+    const bidRef = doc(collection(db,'auction','state','bids'));
+    await setDoc(bidRef, {
+      teamId: auctionState.currentTeamId,
+      amount,
+      bidder: currentUser.displayName || currentUser.email,
+      bidderId: currentUser.uid,
+      at: serverTimestamp()
+    });
+  } catch(e) { showToast("Bid failed", e.message); }
+}
+
+function getNextBid(cur) {
+  if(cur===0) return 25;
+  if(cur<100) return cur+25;
+  if(cur<500) return cur+50;
+  return cur+100;
+}
+
+// ── TIMER ────────────────────────────────────────────────────
+function startLocalTimer(timerEnd) {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    const remaining = Math.max(0, Math.ceil((timerEnd - Date.now()) / 1000));
+    updateTimerDisplay(remaining, auctionState ? flightOf(auctionState.currentTeamId) : 'A');
+    if (remaining <= 0) clearInterval(timerInterval);
+  }, 250);
+}
+
+function updateTimerDisplay(val, flight) {
+  const el = document.getElementById('timerNum');
+  const arc = document.getElementById('timerArc');
+  if (!el || !arc) return;
+  el.textContent = val;
+  const CIRC = 2 * Math.PI * 49;
+  arc.style.strokeDashoffset = CIRC * (1 - val/TIMER_SEC);
+  arc.style.stroke = val<=10 ? '#e85555' : val<=20 ? '#E8C96A' : (FLIGHT_COLORS[flight]||'#C9A84C');
+}
+
+// ── RENDER ───────────────────────────────────────────────────
+function renderWaiting() {
+  document.getElementById('auctionArea').innerHTML = `
+    <div class="waiting-msg">
+      <div class="wm-icon">⛳</div>
+      <div class="wm-title">Waiting for the Host</div>
+      <div class="wm-sub">The auction will begin shortly. Get your bids ready!</div>
+    </div>`;
+}
+
+function renderAuction(prev) {
+  if (!auctionState) return;
+  const { status, currentTeamId, currentBid, currentBidder, currentBidderId, soldTeams, timerEnd, queue } = auctionState;
+
+  if (status === 'complete') { renderComplete(); return; }
+  if (!currentTeamId) { renderWaiting(); return; }
+
+  const team = teamById(currentTeamId);
+  if (!team) return;
+  const flight = flightOf(currentTeamId);
+  const fc = FLIGHT_COLORS[flight];
+  const isMyBid = currentBidderId === currentUser?.uid;
+  const nextBid = getNextBid(currentBid);
+  const sold = soldTeams || {};
+  const totalPot = Object.values(sold).reduce((s,v)=>s+(v.price||0),0);
+  const soldCount = Object.keys(sold).length;
+  const teamsLeft = (queue||[]).length;
+
+  // Quick bid options
+  const inc = nextBid - currentBid || 25;
+  const quickOpts = currentBid===0 ? [25,50,100,200] : [nextBid, nextBid+inc, nextBid+inc*2, nextBid+inc*4];
+
+  document.getElementById('auctionArea').innerHTML = `
+    <!-- STATS BAR -->
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-l">Total Pot</div><div class="stat-v gold">${fmtMoney(totalPot)}</div></div>
+      <div class="stat"><div class="stat-l">Sold</div><div class="stat-v">${soldCount} / 25</div></div>
+      <div class="stat"><div class="stat-l">Remaining</div><div class="stat-v">${teamsLeft + 1}</div></div>
+      <div class="stat"><div class="stat-l">Flight</div><div class="stat-v" style="color:${fc}">${flight}</div></div>
+    </div>
+
+    <!-- AUCTION CARD -->
+    <div class="auction-card" style="border-color:${fc}40; --fc:${fc}">
+      <div class="ac-top-bar" style="background:linear-gradient(90deg,transparent,${fc},transparent)"></div>
+      <div class="ac-header">
+        <div class="live-pill"><span class="live-dot"></span>LIVE</div>
+        <div class="flight-pill" style="color:${fc};border-color:${fc}40;background:${fc}18">Flight ${flight}</div>
+      </div>
+      <div class="ac-team">
+        <div class="ac-names">${team.p1}<br><span class="amp">&</span> ${team.p2}</div>
+        <div class="ac-tee">${team.tee}</div>
+      </div>
+      <div class="ac-mid">
+        <div class="ac-bid-block">
+          <div class="ac-bid-label">Current Bid</div>
+          <div class="ac-bid-amount" style="color:${fc}">${currentBid ? '$'+currentBid : 'No bids yet'}</div>
+          <div class="ac-bid-by">${currentBidder ? (isMyBid ? '🏆 You are winning!' : `Leading: ${currentBidder}`) : 'Be the first to bid!'}</div>
+        </div>
+        <div class="timer-block">
+          <div class="timer-circle">
+            <svg viewBox="0 0 106 106"><circle cx="53" cy="53" r="49" id="timerArc" style="stroke:${fc}"/></svg>
+            <div class="timer-number" id="timerNum">30</div>
+            <div class="timer-label">sec</div>
+          </div>
+        </div>
+      </div>
+      ${isMyBid ? `
+        <div class="winning-banner" style="background:${fc}22;border-color:${fc}40;color:${fc}">
+          🏆 You hold the winning bid at $${currentBid} — hold on!
+        </div>` : `
+        <div class="bid-actions">
+          <button class="bid-main-btn" style="background:linear-gradient(135deg,${fc},${fc}99)" onclick="placeBid()">
+            Bid $${nextBid}
+          </button>
+          <div class="quick-bids">
+            ${quickOpts.map(v=>`<button class="qb" onclick="placeQuickBid(${v})">$${v}</button>`).join('')}
+          </div>
+        </div>`}
+    </div>
+
+    <!-- FLIGHT PANELS -->
+    <div class="flights-row">
+      ${['A','B','C','D'].map(f => renderFlightPanel(f, sold)).join('')}
+    </div>
+  `;
+
+  // Start timer
+  startLocalTimer(timerEnd);
+
+  // Animate new team
+  if (!prev || prev.currentTeamId !== currentTeamId) {
+    document.querySelector('.ac-team')?.classList.add('team-slide');
+    setTimeout(()=>document.querySelector('.ac-team')?.classList.remove('team-slide'),600);
+  }
+
+  // Bid flash
+  if (prev && prev.currentBid !== currentBid) {
+    const el = document.querySelector('.ac-bid-amount');
+    if(el){el.classList.add('bid-flash');setTimeout(()=>el.classList.remove('bid-flash'),600);}
+  }
+
+  updateTimerDisplay(Math.max(0,Math.ceil((timerEnd-Date.now())/1000)), flight);
+}
+
+function renderFlightPanel(f, sold) {
+  const teams = FLIGHTS[f];
+  const fc = FLIGHT_COLORS[f];
+  const soldF = teams.filter(t=>sold[t.id]);
+  const curId = auctionState?.currentTeamId;
+  return `
+    <div class="fp" style="border-color:${fc}28">
+      <div class="fp-title" style="color:${fc};border-bottom-color:${fc}20">
+        Flight ${f} <span class="fp-prog">${soldF.length}/${teams.length}</span>
+      </div>
+      ${teams.map(t => {
+        const s = sold[t.id];
+        const isCur = t.id === curId;
+        return `<div class="fp-row ${s?'fp-sold':isCur?'fp-cur':''}">
+          <div>
+            <div class="fp-names">${t.p1} & ${t.p2}</div>
+            ${s ? `<div class="fp-buyer">${s.buyer}</div>` : `<div class="fp-tee">${t.tee}</div>`}
+          </div>
+          <div class="fp-right">
+            ${s ? `<div class="fp-price" style="color:${fc}">${fmtMoney(s.price)}</div>` : ''}
+            <div class="fp-dot ${s?'dot-sold':isCur?'dot-cur':'dot-pend'}" style="${isCur?'box-shadow:0 0 6px '+fc:s?'background:'+fc:''}"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderComplete() {
+  const sold = auctionState?.soldTeams || {};
+  const total = Object.values(sold).reduce((s,v)=>s+(v.price||0),0);
+  document.getElementById('auctionArea').innerHTML = `
+    <div class="waiting-msg">
+      <div class="wm-icon">🏆</div>
+      <div class="wm-title">Auction Complete!</div>
+      <div class="wm-sub">Total pot: <strong style="color:var(--gold)">$${total.toLocaleString()}</strong></div>
+      <div class="complete-grid">
+        ${['A','B','C','D'].map(f=>`
+          <div class="fp" style="border-color:${FLIGHT_COLORS[f]}28">
+            <div class="fp-title" style="color:${FLIGHT_COLORS[f]};border-bottom-color:${FLIGHT_COLORS[f]}20">Flight ${f}</div>
+            ${FLIGHTS[f].map(t=>{
+              const s=sold[t.id];
+              return `<div class="fp-row ${s?'fp-sold':''}">
+                <div><div class="fp-names">${t.p1} & ${t.p2}</div>${s?`<div class="fp-buyer">${s.buyer}</div>`:''}</div>
+                <div class="fp-price" style="color:${FLIGHT_COLORS[f]}">${s?fmtMoney(s.price):'—'}</div>
+              </div>`;
+            }).join('')}
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+// make enterKey work on auth forms
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (document.getElementById('authRegister').style.display !== 'none') window.doRegister();
+  else if (document.getElementById('authLogin').style.display !== 'none') window.doLogin();
+});
+
+</script>
+
+<style>
+:root {
+  --gold:#C9A84C; --gold-light:#E8C96A; --gold-dark:#8B6914;
+  --green:#1A3A2A; --green-mid:#2D5A3D; --green-light:#3D7A52;
+  --cream:#F8F3E8; --white:#FDFAF4;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:var(--green);color:var(--cream);
+  font-family:'Cormorant Garamond',serif;min-height:100vh;overflow-x:hidden;
+  background-image:
+    radial-gradient(ellipse at 20% 0%,rgba(201,168,76,.08) 0%,transparent 60%),
+    radial-gradient(ellipse at 80% 100%,rgba(201,168,76,.06) 0%,transparent 60%),
+    repeating-linear-gradient(45deg,transparent,transparent 60px,rgba(255,255,255,.012) 60px,rgba(255,255,255,.012) 61px);
+}
+
+/* ── HEADER ── */
+header{text-align:center;padding:32px 20px 22px;border-bottom:1px solid rgba(201,168,76,.22);}
+.logo-flag{font-family:'Bebas Neue',sans-serif;font-size:clamp(12px,3vw,16px);letter-spacing:.4em;color:var(--gold);margin-bottom:6px;opacity:.85;}
+.logo-main{font-family:'Playfair Display',serif;font-size:clamp(46px,9vw,82px);font-weight:900;color:var(--white);line-height:.9;letter-spacing:-.02em;text-shadow:0 4px 40px rgba(201,168,76,.3);}
+.logo-main span{color:var(--gold);font-style:italic;}
+.gold-rule{width:70px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:14px auto;}
+.event-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(12px,2.5vw,15px);letter-spacing:.3em;color:rgba(201,168,76,.65);margin-top:4px;}
+
+/* ── USER BAR ── */
+.user-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;background:rgba(0,0,0,.22);border-bottom:1px solid rgba(201,168,76,.1);flex-wrap:wrap;gap:8px;}
+.user-bar .ub-name{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:.25em;color:rgba(248,243,232,.55);}
+.user-bar .ub-name strong{color:var(--gold);}
+.ub-right{display:flex;gap:8px;align-items:center;}
+.ub-btn{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.18);color:rgba(248,243,232,.45);font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.2em;padding:6px 12px;border-radius:3px;cursor:pointer;transition:all .2s;}
+.ub-btn:hover{border-color:var(--gold);color:var(--gold);}
+.ub-btn.danger:hover{border-color:#e85555;color:#e85555;}
+
+/* ── AUTH SCREEN ── */
+#authScreen{min-height:calc(100vh - 120px);display:flex;align-items:center;justify-content:center;padding:40px 20px;}
+.auth-card{width:100%;max-width:420px;background:rgba(0,0,0,.35);border:1px solid rgba(201,168,76,.25);border-radius:6px;padding:40px;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+.auth-card h2{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--white);margin-bottom:6px;}
+.auth-card p{font-size:15px;color:rgba(248,243,232,.45);margin-bottom:28px;}
+.auth-card::before{content:'';display:block;height:3px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:-40px -40px 36px;border-radius:6px 6px 0 0;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.3em;color:rgba(248,243,232,.4);margin-bottom:6px;}
+.field input{width:100%;background:rgba(0,0,0,.3);border:1px solid rgba(201,168,76,.25);color:var(--cream);font-family:'Cormorant Garamond',serif;font-size:17px;padding:12px 15px;border-radius:3px;outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--gold);}
+.field input::placeholder{color:rgba(248,243,232,.25);}
+.auth-btn{width:100%;background:linear-gradient(135deg,var(--gold),var(--gold-dark));color:var(--green);border:none;padding:14px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.25em;border-radius:3px;cursor:pointer;transition:all .2s;margin-top:4px;}
+.auth-btn:hover{background:linear-gradient(135deg,var(--gold-light),var(--gold));transform:translateY(-1px);}
+.auth-err{color:#e87070;font-size:13px;margin-top:8px;min-height:18px;}
+.auth-switch{text-align:center;margin-top:20px;font-size:14px;color:rgba(248,243,232,.38);}
+.auth-switch a{color:var(--gold);cursor:pointer;text-decoration:underline;}
+
+/* ── APP ── */
+#appScreen{display:none;}
+main{max-width:1060px;margin:0 auto;padding:28px 16px 80px;}
+
+/* ── HOST PANEL ── */
+.host-section{background:rgba(0,0,0,.25);border:1px solid rgba(201,168,76,.15);border-radius:4px;padding:20px;margin-bottom:24px;}
+.host-section-title{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:.4em;color:rgba(201,168,76,.6);margin-bottom:14px;}
+#hostLoginPanel .field{margin-bottom:10px;}
+.host-btns{display:flex;gap:10px;flex-wrap:wrap;}
+.h-btn{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:var(--gold);font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:.2em;padding:10px 20px;border-radius:3px;cursor:pointer;transition:all .2s;}
+.h-btn:hover{background:rgba(201,168,76,.2);}
+.h-btn.primary{background:linear-gradient(135deg,var(--gold),var(--gold-dark));color:var(--green);}
+.h-btn.primary:hover{background:linear-gradient(135deg,var(--gold-light),var(--gold));}
+
+/* ── STATS BAR ── */
+.stats-bar{display:flex;justify-content:center;gap:32px;padding:16px;background:rgba(0,0,0,.18);border-radius:4px;margin-bottom:22px;flex-wrap:wrap;border:1px solid rgba(201,168,76,.1);}
+.stat{text-align:center;}
+.stat-l{font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.28em;color:rgba(248,243,232,.35);}
+.stat-v{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--white);}
+.stat-v.gold{color:var(--gold);}
+
+/* ── AUCTION CARD ── */
+.auction-card{border:1px solid;border-radius:4px;padding:28px;margin-bottom:24px;position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(45,90,61,.5),rgba(26,58,42,.8));box-shadow:0 16px 50px rgba(0,0,0,.35);}
+.ac-top-bar{position:absolute;top:0;left:0;right:0;height:3px;}
+.ac-header{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+.live-pill{display:flex;align-items:center;gap:6px;font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.3em;color:#4CAF50;}
+.live-dot{width:7px;height:7px;background:#4CAF50;border-radius:50%;animation:pulse 1.4s infinite;box-shadow:0 0 7px #4CAF50;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
+.flight-pill{font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.3em;border:1px solid;padding:3px 12px;border-radius:2px;}
+
+.ac-team{margin-bottom:20px;}
+.ac-names{font-family:'Playfair Display',serif;font-size:clamp(22px,4.5vw,40px);font-weight:700;color:var(--white);line-height:1.1;}
+.amp{color:var(--gold);font-style:italic;font-size:.85em;}
+.ac-tee{font-size:13px;color:rgba(248,243,232,.38);margin-top:6px;letter-spacing:.08em;}
+.team-slide{animation:slideIn .5s ease;}
+@keyframes slideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+.ac-mid{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:20px;}
+.ac-bid-label{font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.3em;color:rgba(248,243,232,.38);}
+.ac-bid-amount{font-family:'Playfair Display',serif;font-size:clamp(32px,6vw,52px);font-weight:700;line-height:1;transition:color .3s;}
+.bid-flash{animation:flash .5s ease;}
+@keyframes flash{0%,100%{opacity:1}50%{opacity:.3}}
+.ac-bid-by{font-size:14px;color:rgba(248,243,232,.45);margin-top:4px;font-style:italic;}
+
+.timer-block{text-align:center;flex-shrink:0;}
+.timer-circle{width:96px;height:96px;border-radius:50%;border:3px solid rgba(201,168,76,.2);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;margin:0 auto;}
+.timer-circle svg{position:absolute;top:-3px;left:-3px;width:102px;height:102px;transform:rotate(-90deg);}
+.timer-circle svg circle{fill:none;stroke-width:3;stroke-linecap:round;stroke-dasharray:307.9;stroke-dashoffset:0;transition:stroke-dashoffset .9s linear,stroke .3s;}
+.timer-number{font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--white);line-height:1;position:relative;z-index:1;}
+.timer-label{font-size:9px;letter-spacing:.3em;color:rgba(248,243,232,.38);text-transform:uppercase;position:relative;z-index:1;}
+
+.winning-banner{border:1px solid;border-radius:3px;padding:14px 18px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.2em;text-align:center;}
+.bid-actions{}
+.bid-main-btn{width:100%;border:none;padding:15px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.25em;border-radius:3px;cursor:pointer;color:#fff;transition:all .2s;margin-bottom:10px;box-shadow:0 4px 20px rgba(0,0,0,.3);}
+.bid-main-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.4);}
+.quick-bids{display:flex;gap:8px;flex-wrap:wrap;}
+.qb{background:rgba(201,168,76,.09);border:1px solid rgba(201,168,76,.25);color:var(--gold-light);padding:8px 14px;font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:.12em;border-radius:3px;cursor:pointer;transition:all .2s;flex:1;min-width:60px;}
+.qb:hover{background:rgba(201,168,76,.2);border-color:var(--gold);color:var(--gold);}
+
+/* ── FLIGHT PANELS ── */
+.flights-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:620px){.flights-row{grid-template-columns:1fr;}}
+.fp{background:rgba(0,0,0,.2);border:1px solid;border-radius:4px;padding:16px;}
+.fp-title{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:.38em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid;display:flex;justify-content:space-between;}
+.fp-prog{font-size:11px;opacity:.55;letter-spacing:.1em;}
+.fp-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;}
+.fp-row:last-child{border-bottom:none;}
+.fp-names{color:var(--cream);font-weight:600;font-size:12px;}
+.fp-tee{color:rgba(248,243,232,.28);font-size:10px;letter-spacing:.08em;margin-top:1px;}
+.fp-buyer{font-size:11px;color:rgba(248,243,232,.4);font-style:italic;margin-top:1px;}
+.fp-right{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:6px;}
+.fp-price{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;}
+.fp-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dot-sold{background:#4CAF50;}
+.dot-cur{background:#E8C96A;animation:pulse 1.2s infinite;box-shadow:0 0 5px #E8C96A;}
+.dot-pend{background:rgba(255,255,255,.15);}
+.fp-sold .fp-names{opacity:.7;}
+.fp-cur .fp-names{color:#E8C96A;}
+
+/* ── WAITING ── */
+.waiting-msg{text-align:center;padding:60px 20px;}
+.wm-icon{font-size:48px;margin-bottom:16px;}
+.wm-title{font-family:'Playfair Display',serif;font-size:30px;color:var(--white);margin-bottom:10px;}
+.wm-sub{font-size:17px;color:rgba(248,243,232,.45);}
+.complete-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px;text-align:left;}
+@media(max-width:580px){.complete-grid{grid-template-columns:1fr;}}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--green-mid);border:1px solid var(--gold);border-left:4px solid var(--gold);color:var(--cream);padding:12px 16px;border-radius:3px;font-size:13px;max-width:260px;transform:translateX(130%);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.4);}
+.toast.show{transform:translateX(0);}
+.toast strong{color:var(--gold);display:block;margin-bottom:2px;font-family:'Bebas Neue',sans-serif;letter-spacing:.18em;font-size:11px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-flag">Ladies' Calcutta Auction</div>
+  <div class="logo-main">Gal<span>cutta</span></div>
+  <div class="gold-rule"></div>
+  <div class="event-name">MGA Fourball 2026 · Brookfield Country Club</div>
+</header>
+
+<!-- ── AUTH SCREEN ── -->
+<div id="authScreen">
+  <!-- REGISTER -->
+  <div class="auth-card" id="authRegister" style="display:none">
+    <h2>Join Galcutta</h2>
+    <p>Create your account to bid on teams</p>
+    <div class="field"><label>Your Name</label><input id="regName" placeholder="e.g. Sarah Mitchell"></div>
+    <div class="field"><label>Email</label><input id="regEmail" type="email" placeholder="you@email.com"></div>
+    <div class="field"><label>Password</label><input id="regPass" type="password" placeholder="Choose a password"></div>
+    <div class="auth-err" id="regErr"></div>
+    <button class="auth-btn" onclick="doRegister()">Create Account</button>
+    <div class="auth-switch">Already have an account? <a onclick="showLogin()">Sign in</a></div>
+  </div>
+  <!-- LOGIN -->
+  <div class="auth-card" id="authLogin">
+    <h2>Welcome Back</h2>
+    <p>Sign in to place your bids</p>
+    <div class="field"><label>Email</label><input id="loginEmail" type="email" placeholder="you@email.com"></div>
+    <div class="field"><label>Password</label><input id="loginPass" type="password" placeholder="Your password"></div>
+    <div class="auth-err" id="loginErr"></div>
+    <button class="auth-btn" onclick="doLogin()">Sign In</button>
+    <div class="auth-switch">New here? <a onclick="showRegister()">Create an account</a></div>
+  </div>
+</div>
+
+<!-- ── APP SCREEN ── -->
+<div id="appScreen">
+  <div class="user-bar">
+    <div class="ub-name">Signed in as <strong id="userName"></strong></div>
+    <div class="ub-right">
+      <button class="ub-btn" onclick="document.getElementById('hostSection').style.display=document.getElementById('hostSection').style.display==='none'?'':'none'">🔑 Host</button>
+      <button class="ub-btn danger" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+
+  <main>
+    <!-- HOST SECTION -->
+    <div class="host-section" id="hostSection" style="display:none">
+      <div class="host-section-title">Host Controls</div>
+      <!-- Host login -->
+      <div id="hostLoginPanel">
+        <div class="field" style="margin-bottom:10px;max-width:280px">
+          <label>Host Password</label>
+          <input type="password" id="hostPw" placeholder="Enter host password">
+        </div>
+        <div class="auth-err" id="hostPwErr" style="margin-bottom:10px"></div>
+        <button class="h-btn primary" onclick="activateHost()">Activate Host Mode</button>
+      </div>
+      <!-- Host controls (shown after login) -->
+      <div id="hostControls" style="display:none">
+        <div class="host-btns">
+          <button class="h-btn primary" onclick="hostInitAuction()">▶ Start / Restart Auction</button>
+          <button class="h-btn" onclick="hostNextTeam()">✓ Sold — Next Team</button>
+          <button class="h-btn" onclick="hostResetTimer()">↺ Reset Timer</button>
+          <button class="h-btn" onclick="hostSkipTeam()">⇥ Skip Team</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUCTION AREA (rendered by JS) -->
+    <div id="auctionArea">
+      <div class="waiting-msg">
+        <div class="wm-icon">⛳</div>
+        <div class="wm-title">Connecting…</div>
+        <div class="wm-sub">Loading auction data</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"><strong id="toastTitle"></strong><span id="toastMsg"></span></div>
+
+</body>
+</html>
