@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galcutta – Leaderboard & Shootout</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Cormorant+Garamond:wght@300;400;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold:#C9A84C;--gold-light:#E8C96A;--gold-dark:#8B6914;
+  --green:#1A3A2A;--green-mid:#2D5A3D;--green-light:#3D7A52;
+  --cream:#F8F3E8;--white:#FDFAF4;
+  --fa:#C9A84C;--fb:#7EB8A4;--fc-col:#A47EB8;--fd:#E88C6A;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--green);color:var(--cream);font-family:'Cormorant Garamond',serif;min-height:100vh;overflow-x:hidden;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(201,168,76,.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(201,168,76,.06) 0%,transparent 60%);}
+
+/* NAV */
+header{text-align:center;padding:28px 20px 20px;border-bottom:1px solid rgba(201,168,76,.22);}
+.logo-flag{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:.4em;color:var(--gold);margin-bottom:6px;opacity:.85;}
+.logo-main{font-family:'Playfair Display',serif;font-size:clamp(40px,8vw,72px);font-weight:900;color:var(--white);line-height:.9;letter-spacing:-.02em;text-shadow:0 4px 40px rgba(201,168,76,.3);}
+.logo-main span{color:var(--gold);font-style:italic;}
+.gold-rule{width:60px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:12px auto;}
+.event-name{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:.3em;color:rgba(201,168,76,.65);}
+
+.page-nav{display:flex;justify-content:center;gap:0;background:rgba(0,0,0,.25);border-bottom:1px solid rgba(201,168,76,.15);}
+.nav-tab{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.35em;padding:14px 28px;cursor:pointer;color:rgba(248,243,232,.4);border-bottom:3px solid transparent;transition:all .2s;text-decoration:none;}
+.nav-tab:hover{color:rgba(248,243,232,.7);}
+.nav-tab.active{color:var(--white);border-bottom-color:var(--gold);}
+
+main{max-width:1100px;margin:0 auto;padding:32px 16px 80px;}
+
+/* SECTION HEADERS */
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(18px,4vw,26px);letter-spacing:.4em;color:var(--gold);margin-bottom:24px;display:flex;align-items:center;gap:16px;}
+.section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(201,168,76,.3),transparent);}
+
+/* POT SUMMARY */
+.pot-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:36px;}
+@media(max-width:600px){.pot-summary{grid-template-columns:repeat(2,1fr);}}
+.pot-card{background:rgba(0,0,0,.25);border:1px solid rgba(201,168,76,.18);border-radius:4px;padding:18px;text-align:center;}
+.pot-card .pc-label{font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.3em;color:rgba(248,243,232,.38);}
+.pot-card .pc-val{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:var(--gold);margin-top:4px;}
+.pot-card .pc-sub{font-size:12px;color:rgba(248,243,232,.35);margin-top:2px;font-style:italic;}
+
+/* PAYOUT TABLE */
+.payout-table{width:100%;border-collapse:collapse;margin-bottom:40px;}
+.payout-table th{font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.3em;color:rgba(248,243,232,.4);padding:10px 14px;text-align:left;border-bottom:1px solid rgba(201,168,76,.15);}
+.payout-table td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.05);font-size:15px;}
+.payout-table tr:last-child td{border-bottom:none;}
+.payout-table .rank{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--gold);}
+.payout-table .owner-name{font-weight:600;color:var(--white);}
+.payout-table .teams-owned{font-size:12px;color:rgba(248,243,232,.4);font-style:italic;margin-top:2px;}
+.payout-table .pct{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.15em;color:rgba(248,243,232,.5);}
+.payout-table .amount{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--gold);}
+.gold-row td{background:rgba(201,168,76,.08);}
+.silver-row td{background:rgba(192,192,192,.06);}
+.bronze-row td{background:rgba(205,127,50,.06);}
+
+/* FLIGHT LEADERBOARDS */
+.flights-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:40px;}
+@media(max-width:660px){.flights-grid{grid-template-columns:1fr;}}
+.flight-board{background:rgba(0,0,0,.2);border:1px solid;border-radius:4px;overflow:hidden;}
+.flight-board[data-f="A"]{border-color:rgba(201,168,76,.25);}
+.flight-board[data-f="B"]{border-color:rgba(126,184,164,.25);}
+.flight-board[data-f="C"]{border-color:rgba(164,126,184,.25);}
+.flight-board[data-f="D"]{border-color:rgba(232,140,106,.25);}
+.fb-header{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.06);}
+.fb-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.4em;}
+.flight-board[data-f="A"] .fb-title{color:var(--fa);}
+.flight-board[data-f="B"] .fb-title{color:var(--fb);}
+.flight-board[data-f="C"] .fb-title{color:var(--fc-col);}
+.flight-board[data-f="D"] .fb-title{color:var(--fd);}
+.fb-advance{font-family:'Bebas Neue',sans-serif;font-size:10px;letter-spacing:.2em;padding:3px 8px;border-radius:2px;border:1px solid;}
+.flight-board[data-f="A"] .fb-advance{color:var(--fa);border-color:rgba(201,168,76,.3);background:rgba(201,168,76,.1);}
+.flight-board[data-f="B"] .fb-advance{color:var(--fb);border-color:rgba(126,184,164,.3);background:rgba(126,184,164,.1);}
+.flight-board[data-f="C"] .fb-advance{color:var(--fc-col);border-color:rgba(164,126,184,.3);background:rgba(164,126,184,.1);}
+.flight-board[data-f="D"] .fb-advance{color:var(--fd);border-color:rgba(232,140,106,.3);background:rgba(232,140,106,.1);}
+
+.fb-row{display:grid;grid-template-columns:28px 1fr auto auto;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.04);}
+.fb-row:last-child{border-bottom:none;}
+.fb-row.leader{background:rgba(255,255,255,.04);}
+.fb-pos{font-family:'Bebas Neue',sans-serif;font-size:16px;color:rgba(248,243,232,.3);}
+.fb-row.leader .fb-pos{color:var(--gold);}
+.fb-names{font-size:13px;font-weight:600;color:var(--cream);}
+.fb-owner{font-size:11px;color:rgba(248,243,232,.35);font-style:italic;margin-top:1px;}
+.fb-record{font-size:12px;color:rgba(248,243,232,.4);letter-spacing:.05em;}
+.fb-pts{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;}
+.flight-board[data-f="A"] .fb-row.leader .fb-pts{color:var(--fa);}
+.flight-board[data-f="B"] .fb-row.leader .fb-pts{color:var(--fb);}
+.flight-board[data-f="C"] .fb-row.leader .fb-pts{color:var(--fc-col);}
+.flight-board[data-f="D"] .fb-row.leader .fb-pts{color:var(--fd);}
+.fb-row:not(.leader) .fb-pts{color:rgba(248,243,232,.6);}
+.advance-star{font-size:14px;}
+
+/* MATCH RESULTS */
+.matches-section{margin-bottom:40px;}
+.match-tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid rgba(201,168,76,.15);}
+.match-tab{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:.3em;padding:10px 20px;cursor:pointer;color:rgba(248,243,232,.4);border-bottom:2px solid transparent;transition:all .2s;}
+.match-tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+.match-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:580px){.match-grid{grid-template-columns:1fr;}}
+.match-card{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.07);border-radius:4px;padding:16px;position:relative;}
+.match-card.completed{border-color:rgba(201,168,76,.2);}
+.match-round{font-family:'Bebas Neue',sans-serif;font-size:10px;letter-spacing:.25em;color:rgba(248,243,232,.3);margin-bottom:8px;}
+.match-teams{display:flex;align-items:center;gap:8px;justify-content:space-between;}
+.match-team{flex:1;}
+.match-team-name{font-size:13px;font-weight:600;color:var(--cream);}
+.match-team-owner{font-size:11px;color:rgba(248,243,232,.35);font-style:italic;}
+.match-score{font-family:'Playfair Display',serif;font-size:24px;font-weight:700;color:var(--gold);text-align:center;min-width:60px;}
+.match-score.pending{font-size:14px;color:rgba(248,243,232,.25);font-family:'Bebas Neue',sans-serif;letter-spacing:.1em;}
+.match-winner{font-family:'Bebas Neue',sans-serif;font-size:10px;letter-spacing:.2em;color:#4CAF50;margin-top:6px;}
+.match-vs{font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.2em;color:rgba(248,243,232,.25);}
+
+/* SCORE ENTRY */
+.score-entry-panel{background:rgba(0,0,0,.25);border:1px solid rgba(201,168,76,.2);border-radius:4px;padding:20px;margin-bottom:24px;}
+.sep-title{font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.35em;color:rgba(201,168,76,.6);margin-bottom:14px;}
+.sep-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.sep-select{background:rgba(0,0,0,.3);border:1px solid rgba(201,168,76,.25);color:var(--cream);font-family:'Cormorant Garamond',serif;font-size:15px;padding:9px 12px;border-radius:3px;outline:none;flex:1;min-width:180px;}
+.sep-select option{background:#1A3A2A;}
+.sep-score-inputs{display:flex;align-items:center;gap:10px;}
+.sep-score-input{background:rgba(0,0,0,.3);border:1px solid rgba(201,168,76,.25);color:var(--cream);font-family:'Playfair Display',serif;font-size:20px;font-weight:700;padding:8px 12px;border-radius:3px;width:70px;text-align:center;outline:none;}
+.sep-dash{font-family:'Bebas Neue',sans-serif;font-size:20px;color:rgba(248,243,232,.3);}
+.sep-btn{background:linear-gradient(135deg,var(--gold),var(--gold-dark));color:var(--green);border:none;padding:10px 22px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.2em;border-radius:3px;cursor:pointer;transition:all .2s;}
+.sep-btn:hover{background:linear-gradient(135deg,var(--gold-light),var(--gold));}
+
+/* SHOOTOUT */
+.shootout-bracket{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:40px;}
+@media(max-width:700px){.shootout-bracket{grid-template-columns:repeat(2,1fr);}}
+.sb-card{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:20px;text-align:center;position:relative;}
+.sb-card.champion{border-color:rgba(201,168,76,.5);background:rgba(201,168,76,.08);}
+.sb-card.eliminated{opacity:.5;}
+.sb-place{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:.35em;margin-bottom:10px;}
+.sb-card.champion .sb-place{color:var(--gold);}
+.sb-card:not(.champion) .sb-place{color:rgba(248,243,232,.4);}
+.sb-trophy{font-size:28px;margin-bottom:8px;}
+.sb-team{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--white);}
+.sb-owner{font-size:12px;color:rgba(248,243,232,.4);font-style:italic;margin-top:4px;}
+.sb-flight{font-family:'Bebas Neue',sans-serif;font-size:10px;letter-spacing:.2em;margin-top:8px;padding:2px 8px;border-radius:2px;display:inline-block;}
+.sb-elim{font-family:'Bebas Neue',sans-serif;font-size:10px;letter-spacing:.2em;color:rgba(248,243,232,.3);margin-top:8px;}
+
+/* PARTICIPANT LEADERBOARD */
+.participant-table{width:100%;border-collapse:collapse;margin-bottom:40px;}
+.participant-table th{font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.28em;color:rgba(248,243,232,.35);padding:10px 14px;text-align:left;border-bottom:1px solid rgba(201,168,76,.12);}
+.participant-table td{padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.04);font-size:14px;vertical-align:top;}
+.participant-table tr:last-child td{border-bottom:none;}
+.pt-rank{font-family:'Bebas Neue',sans-serif;font-size:20px;color:rgba(248,243,232,.3);}
+.pt-rank.p1{color:#FFD700;}
+.pt-rank.p2{color:#C0C0C0;}
+.pt-rank.p3{color:#CD7F32;}
+.pt-name{font-weight:600;color:var(--white);font-size:15px;}
+.pt-teams{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+.pt-team-tag{font-size:11px;padding:2px 8px;border-radius:2px;border:1px solid;font-family:'Bebas Neue',sans-serif;letter-spacing:.1em;}
+.pt-winnings{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--gold);}
+.pt-winnings.zero{color:rgba(248,243,232,.25);font-size:15px;}
+.pt-status{font-size:12px;color:rgba(248,243,232,.35);font-style:italic;margin-top:2px;}
+
+/* ADMIN */
+.admin-section{background:rgba(0,0,0,.2);border:1px solid rgba(201,168,76,.12);border-radius:4px;padding:20px;margin-bottom:24px;}
+.admin-title{font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.35em;color:rgba(201,168,76,.5);margin-bottom:14px;}
+.admin-btns{display:flex;gap:10px;flex-wrap:wrap;}
+.a-btn{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);color:rgba(248,243,232,.5);font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.2em;padding:9px 16px;border-radius:3px;cursor:pointer;transition:all .2s;}
+.a-btn:hover{border-color:var(--gold);color:var(--gold);}
+.a-btn.primary{background:linear-gradient(135deg,var(--gold),var(--gold-dark));color:var(--green);border:none;}
+.a-btn.primary:hover{background:linear-gradient(135deg,var(--gold-light),var(--gold));}
+
+.toast{position:fixed;bottom:22px;right:22px;background:var(--green-mid);border:1px solid var(--gold);border-left:4px solid var(--gold);color:var(--cream);padding:12px 16px;border-radius:3px;font-size:13px;max-width:260px;transform:translateX(130%);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.4);}
+.toast.show{transform:translateX(0);}
+.toast strong{color:var(--gold);display:block;margin-bottom:2px;font-family:'Bebas Neue',sans-serif;letter-spacing:.18em;font-size:11px;}
+
+.page{display:none;}
+.page.active{display:block;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-flag">Ladies' Calcutta Auction</div>
+  <div class="logo-main">Gal<span>cutta</span></div>
+  <div class="gold-rule"></div>
+  <div class="event-name">MGA Fourball 2026 · Brookfield Country Club</div>
+</header>
+
+<div class="page-nav">
+  <a class="nav-tab" href="galcutta.html">⛳ Auction</a>
+  <a class="nav-tab active" href="#">📊 Leaderboard</a>
+  <a class="nav-tab" href="#" onclick="showPage('shootout')">🏆 Shootout</a>
+</div>
+
+<main>
+
+  <!-- PAGE: LEADERBOARD -->
+  <div class="page active" id="page-leaderboard">
+
+    <!-- ADMIN SCORE ENTRY -->
+    <div class="admin-section" id="adminSection" style="display:none">
+      <div class="admin-title">Admin — Enter Match Results</div>
+      <div class="score-entry-panel">
+        <div class="sep-title">Record Match Score</div>
+        <div class="sep-row">
+          <select class="sep-select" id="matchSelect">
+            <option value="">Select match...</option>
+          </select>
+        </div>
+        <div class="sep-row">
+          <div class="sep-score-inputs">
+            <input type="number" class="sep-score-input" id="score1" min="0" max="9" placeholder="0">
+            <span class="sep-dash">—</span>
+            <input type="number" class="sep-score-input" id="score2" min="0" max="9" placeholder="0">
+          </div>
+          <button class="sep-btn" onclick="submitScore()">Save Score</button>
+        </div>
+        <div style="font-size:12px;color:rgba(248,243,232,.3);font-style:italic">Enter points won per team (e.g. 5 — 4)</div>
+      </div>
+      <div class="admin-btns">
+        <button class="a-btn primary" onclick="resetAllScores()">↺ Reset Demo Scores</button>
+        <button class="a-btn primary" onclick="loadDemoScores()">⚡ Load Demo Results</button>
+      </div>
+    </div>
+
+    <!-- POT SUMMARY -->
+    <div class="section-title">Pot Summary</div>
+    <div class="pot-summary">
+      <div class="pot-card"><div class="pc-label">Total Pot</div><div class="pc-val" id="totalPotDisplay">$4,850</div><div class="pc-sub">From auction</div></div>
+      <div class="pot-card"><div class="pc-label">1st Place</div><div class="pc-val" id="pot1st">$2,910</div><div class="pc-sub">60% of pot</div></div>
+      <div class="pot-card"><div class="pc-label">2nd Place</div><div class="pc-val" id="pot2nd">$1,455</div><div class="pc-sub">30% of pot</div></div>
+      <div class="pot-card"><div class="pc-label">3rd Place</div><div class="pc-val" id="pot3rd">$485</div><div class="pc-sub">10% of pot</div></div>
+    </div>
+
+    <!-- PARTICIPANT LEADERBOARD -->
+    <div class="section-title">Participant Standings</div>
+    <table class="participant-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Participant</th>
+          <th>Teams</th>
+          <th>Flight Wins</th>
+          <th>Winnings</th>
+        </tr>
+      </thead>
+      <tbody id="participantTableBody"></tbody>
+    </table>
+
+    <!-- FLIGHT LEADERBOARDS -->
+    <div class="section-title">Flight Standings</div>
+    <div class="flights-grid" id="flightsGrid"></div>
+
+    <!-- MATCH RESULTS -->
+    <div class="section-title">Match Results</div>
+    <div class="matches-section">
+      <div class="match-tabs">
+        <div class="match-tab active" onclick="showFlight('A',this)">Flight A</div>
+        <div class="match-tab" onclick="showFlight('B',this)">Flight B</div>
+        <div class="match-tab" onclick="showFlight('C',this)">Flight C</div>
+        <div class="match-tab" onclick="showFlight('D',this)">Flight D</div>
+      </div>
+      <div class="match-grid" id="matchGrid"></div>
+    </div>
+  </div>
+
+  <!-- PAGE: SHOOTOUT -->
+  <div class="page" id="page-shootout">
+    <div class="section-title">Shootout Bracket</div>
+    <div class="shootout-bracket" id="shootoutBracket"></div>
+
+    <div class="section-title">Final Payouts</div>
+    <table class="payout-table" id="payoutTable">
+      <thead><tr><th>Place</th><th>Participant</th><th>Winning Team</th><th>Share</th><th>Amount</th></tr></thead>
+      <tbody id="payoutBody"></tbody>
+    </table>
+
+    <!-- ADMIN SHOOTOUT -->
+    <div class="admin-section" id="shootoutAdmin" style="display:none">
+      <div class="admin-title">Admin — Shootout Results</div>
+      <div class="admin-btns">
+        <button class="a-btn primary" onclick="loadDemoShootout()">⚡ Load Demo Shootout</button>
+        <button class="a-btn" onclick="resetShootout()">↺ Reset Shootout</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"><strong id="toastTitle"></strong><span id="toastMsg"></span></div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────
+const FLIGHT_COLORS = {A:'#C9A84C',B:'#7EB8A4',C:'#A47EB8',D:'#E88C6A'};
+const TOTAL_POT = 4850;
+
+// 8 demo participants
+const PARTICIPANTS = [
+  {id:'p1', name:'Jennifer Walsh'},
+  {id:'p2', name:'Patricia Dunn'},
+  {id:'p3', name:'Linda Crawford'},
+  {id:'p4', name:'Susan Prescott'},
+  {id:'p5', name:'Margaret Flynn'},
+  {id:'p6', name:'Deborah Sims'},
+  {id:'p7', name:'Carol Bennett'},
+  {id:'p8', name:'Donna Hartley'},
+];
+
+// 24 teams (Flight A drops Doug Bishop & Chase Phillips, now 6 teams)
+const TEAMS = {
+  A:[
+    {id:'A1',p1:'Damon Weddington', p2:'Tiger Greene'},
+    {id:'A2',p1:'John Ulecki',      p2:'Mark Backus'},
+    {id:'A3',p1:'Adam Wittan',      p2:'Jonathan Cory Marcus'},
+    {id:'A4',p1:'Mark Sphar',       p2:'Steve Thomas'},
+    {id:'A5',p1:'Dean Robertson',   p2:'Kyle Bowman'},
+    {id:'A6',p1:'Jim Broadway Jr.', p2:'Jim Broadway'},
+  ],
+  B:[
+    {id:'B1',p1:'David Thomson',  p2:'George Connolly'},
+    {id:'B2',p1:'Mike Morgan',    p2:'Cornelius Donnelly'},
+    {id:'B3',p1:'Jack Geis',      p2:'Mike Wylie'},
+    {id:'B4',p1:'Paul Marotta',   p2:'Michael Sewak'},
+    {id:'B5',p1:'Tim Fechalos',   p2:'Neal Redman'},
+    {id:'B6',p1:'Jason Shockley', p2:'Gilad Kochman'},
+  ],
+  C:[
+    {id:'C1',p1:'Matthew Qualman', p2:'David Winters'},
+    {id:'C2',p1:'Dave Gardner',    p2:'Jaques Mostert'},
+    {id:'C3',p1:'Matthew Beam',    p2:'Tyler Dortch'},
+    {id:'C4',p1:'Jay Pittroff',    p2:'Kevin Filliater'},
+    {id:'C5',p1:'Brad Methvin',    p2:'Rodney Lanxton'},
+    {id:'C6',p1:'Danny Broadway',  p2:'Keith Edwards'},
+  ],
+  D:[
+    {id:'D1',p1:'Alan Boyles',    p2:'David Finnis'},
+    {id:'D2',p1:'Austin Layton',  p2:'Brandon Denton'},
+    {id:'D3',p1:'Brandon Scott',  p2:'Trey Chancellor'},
+    {id:'D4',p1:'Danny Corona',   p2:'Christian Caspersen'},
+    {id:'D5',p1:'Wes Brooker',    p2:'Sean Hyslop'},
+    {id:'D6',p1:'Matthew Beck',   p2:'Allen Eager'},
+  ]
+};
+
+// Assign 3 teams per participant (randomly distributed across all 24)
+const ALL_TEAM_IDS = Object.values(TEAMS).flat().map(t=>t.id);
+// Fixed assignment for demo consistency
+const OWNERSHIP = {
+  'A1':'p1','A2':'p2','A3':'p3','A4':'p4','A5':'p5','A6':'p6',
+  'B1':'p7','B2':'p8','B3':'p1','B4':'p2','B5':'p3','B6':'p4',
+  'C1':'p5','C2':'p6','C3':'p7','C4':'p8','C5':'p1','C6':'p2',
+  'D1':'p3','D2':'p4','D3':'p5','D4':'p6','D5':'p7','D6':'p8',
+};
+
+function ownerOf(teamId){ return PARTICIPANTS.find(p=>p.id===OWNERSHIP[teamId]); }
+function teamById(id){ return Object.values(TEAMS).flat().find(t=>t.id===id); }
+
+// Generate round robin matches for a flight
+function generateMatches(flight) {
+  const teams = TEAMS[flight];
+  const matches = [];
+  let round = 1, matchNum = 1;
+  for(let i=0;i<teams.length;i++){
+    for(let j=i+1;j<teams.length;j++){
+      matches.push({
+        id: `${flight}-M${matchNum}`,
+        flight,
+        round,
+        team1: teams[i].id,
+        team2: teams[j].id,
+        score1: null,
+        score2: null
+      });
+      matchNum++;
+      if(matchNum % 3 === 0) round++;
+    }
+  }
+  return matches;
+}
+
+const ALL_MATCHES = {
+  A: generateMatches('A'),
+  B: generateMatches('B'),
+  C: generateMatches('C'),
+  D: generateMatches('D'),
+};
+
+// ── STATE ────────────────────────────────────────────────────
+let scores = {}; // matchId -> {score1, score2}
+let shootoutOrder = []; // [champion, 2nd, 3rd, 4th] team IDs
+let currentMatchFlight = 'A';
+let isAdmin = false;
+
+// ── DEMO DATA ────────────────────────────────────────────────
+function loadDemoScores() {
+  scores = {};
+  ['A','B','C','D'].forEach(f => {
+    ALL_MATCHES[f].forEach((m,i) => {
+      const s1 = [5,6,4,5,7,4,5,6,4,5,6,4,5,6][i%14];
+      const s2 = 9 - s1;
+      scores[m.id] = {score1: s1, score2: s2};
+    });
+  });
+  renderAll();
+  showToast("Demo Loaded","All match results populated!");
+}
+
+function loadDemoShootout() {
+  // Top team from each flight based on demo scores
+  shootoutOrder = ['A2','B5','C3','D1']; // [champion, 2nd, 3rd, eliminated first]
+  renderShootout();
+  renderPayouts();
+  showToast("Shootout Set","Demo shootout results loaded!");
+}
+
+function resetAllScores() {
+  scores = {};
+  shootoutOrder = [];
+  renderAll();
+  showToast("Reset","All scores cleared.");
+}
+
+function resetShootout() {
+  shootoutOrder = [];
+  renderShootout();
+  renderPayouts();
+}
+
+// ── SCORE SUBMISSION ─────────────────────────────────────────
+function submitScore() {
+  const matchId = document.getElementById('matchSelect').value;
+  const s1 = parseInt(document.getElementById('score1').value);
+  const s2 = parseInt(document.getElementById('score2').value);
+  if(!matchId){showToast("Select a match","Please choose a match first.");return;}
+  if(isNaN(s1)||isNaN(s2)){showToast("Enter scores","Please enter both scores.");return;}
+  if(s1+s2 > 9){showToast("Invalid","Scores can't exceed 9 total holes.");return;}
+  scores[matchId] = {score1:s1, score2:s2};
+  renderAll();
+  document.getElementById('score1').value='';
+  document.getElementById('score2').value='';
+  showToast("Score Saved!",`Match recorded: ${s1} — ${s2}`);
+}
+
+// ── STANDINGS CALCULATION ────────────────────────────────────
+function getFlightStandings(flight) {
+  const teams = TEAMS[flight];
+  const matches = ALL_MATCHES[flight];
+  const pts = {};
+  const wins = {};
+  const losses = {};
+  const played = {};
+  teams.forEach(t=>{pts[t.id]=0;wins[t.id]=0;losses[t.id]=0;played[t.id]=0;});
+
+  matches.forEach(m => {
+    const s = scores[m.id];
+    if(!s) return;
+    played[m.team1]++;
+    played[m.team2]++;
+    if(s.score1 > s.score2){pts[m.team1]+=1;wins[m.team1]++;losses[m.team2]++;}
+    else if(s.score2 > s.score1){pts[m.team2]+=1;wins[m.team2]++;losses[m.team1]++;}
+    else{pts[m.team1]+=0.5;pts[m.team2]+=0.5;}
+  });
+
+  return teams.map(t=>({
+    team:t, pts:pts[t.id], wins:wins[t.id], losses:losses[t.id], played:played[t.id]
+  })).sort((a,b)=>b.pts-a.pts);
+}
+
+function getParticipantStandings() {
+  const flightWinners = {};
+  ['A','B','C','D'].forEach(f => {
+    const standings = getFlightStandings(f);
+    if(standings[0].pts > 0) flightWinners[f] = standings[0].team.id;
+  });
+
+  return PARTICIPANTS.map(p => {
+    const myTeams = ALL_TEAM_IDS.filter(id=>OWNERSHIP[id]===p.id);
+    const flightWins = Object.entries(flightWinners).filter(([f,tid])=>myTeams.includes(tid)).map(([f])=>f);
+    const shootoutPos = shootoutOrder.indexOf(myTeams.find(tid=>shootoutOrder.includes(tid)));
+    let winnings = 0;
+    if(shootoutPos === 0) winnings = Math.round(TOTAL_POT * 0.60);
+    else if(shootoutPos === 1) winnings = Math.round(TOTAL_POT * 0.30);
+    else if(shootoutPos === 2) winnings = Math.round(TOTAL_POT * 0.10);
+    return {participant:p, myTeams, flightWins, winnings, shootoutPos};
+  }).sort((a,b)=>b.winnings-a.winnings||b.flightWins.length-a.flightWins.length);
+}
+
+// ── RENDER ───────────────────────────────────────────────────
+function renderAll() {
+  renderFlights();
+  renderMatches(currentMatchFlight);
+  renderParticipants();
+  populateMatchSelect();
+}
+
+function renderFlights() {
+  const grid = document.getElementById('flightsGrid');
+  grid.innerHTML = ['A','B','C','D'].map(f => {
+    const standings = getFlightStandings(f);
+    const fc = FLIGHT_COLORS[f];
+    const totalMatches = ALL_MATCHES[f].length;
+    const played = ALL_MATCHES[f].filter(m=>scores[m.id]).length;
+    return `
+      <div class="flight-board" data-f="${f}">
+        <div class="fb-header">
+          <div class="fb-title">Flight ${f} <span style="font-size:10px;opacity:.5">${played}/${totalMatches} matches</span></div>
+          <div class="fb-advance">Advances →</div>
+        </div>
+        ${standings.map((s,i) => {
+          const owner = ownerOf(s.team.id);
+          return `<div class="fb-row ${i===0?'leader':''}">
+            <div class="fb-pos">${i+1}</div>
+            <div>
+              <div class="fb-names">${s.team.p1} & ${s.team.p2}</div>
+              <div class="fb-owner">${owner?owner.name:'—'}</div>
+            </div>
+            <div class="fb-record" style="font-size:11px">${s.wins}W ${s.losses}L</div>
+            <div class="fb-pts">${s.pts}${i===0?'<span class="advance-star"> ★</span>':''}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }).join('');
+}
+
+function renderMatches(flight) {
+  currentMatchFlight = flight;
+  const matches = ALL_MATCHES[flight];
+  const grid = document.getElementById('matchGrid');
+  grid.innerHTML = matches.map(m => {
+    const t1 = teamById(m.team1);
+    const t2 = teamById(m.team2);
+    const o1 = ownerOf(m.team1);
+    const o2 = ownerOf(m.team2);
+    const s = scores[m.id];
+    const winner = s ? (s.score1>s.score2?1:s.score2>s.score1?2:0) : null;
+    return `
+      <div class="match-card ${s?'completed':''}">
+        <div class="match-round">Match ${m.id}</div>
+        <div class="match-teams">
+          <div class="match-team" style="${winner===1?'opacity:1':'opacity:.7'}">
+            <div class="match-team-name">${t1.p1} & ${t1.p2}</div>
+            <div class="match-team-owner">${o1?o1.name:'—'}</div>
+          </div>
+          <div style="text-align:center">
+            ${s ? `<div class="match-score">${s.score1}–${s.score2}</div>` : `<div class="match-score pending">VS</div>`}
+          </div>
+          <div class="match-team" style="text-align:right;${winner===2?'opacity:1':'opacity:.7'}">
+            <div class="match-team-name">${t2.p1} & ${t2.p2}</div>
+            <div class="match-team-owner">${o2?o2.name:'—'}</div>
+          </div>
+        </div>
+        ${winner ? `<div class="match-winner">✓ ${winner===1?t1.p1+' & '+t1.p2:winner===2?t2.p1+' & '+t2.p2:'Tie'} wins</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function renderParticipants() {
+  const standings = getParticipantStandings();
+  const body = document.getElementById('participantTableBody');
+  body.innerHTML = standings.map((s,i) => {
+    const rankClass = i===0?'p1':i===1?'p2':i===2?'p3':'';
+    return `<tr class="${i===0?'gold-row':i===1?'silver-row':i===2?'bronze-row':''}">
+      <td><div class="pt-rank ${rankClass}">${i+1}</div></td>
+      <td>
+        <div class="pt-name">${s.participant.name}</div>
+        <div class="pt-teams">
+          ${s.myTeams.map(tid=>{
+            const t=teamById(tid);const f=tid[0];const fc=FLIGHT_COLORS[f];
+            return `<span class="pt-team-tag" style="color:${fc};border-color:${fc}40;background:${fc}12">
+              ${t.p1.split(' ')[1]} & ${t.p2.split(' ')[1]}
+            </span>`;
+          }).join('')}
+        </div>
+      </td>
+      <td>${s.flightWins.length>0?s.flightWins.map(f=>`<span style="color:${FLIGHT_COLORS[f]};font-family:'Bebas Neue',sans-serif;letter-spacing:.2em">Flight ${f}</span>`).join(', '):'<span style="color:rgba(248,243,232,.25);font-style:italic">None yet</span>'}</td>
+      <td>${s.shootoutPos>=0&&s.shootoutPos<=2?['🥇 Champion','🥈 2nd Place','🥉 3rd Place'][s.shootoutPos]:'<span style="color:rgba(248,243,232,.25);font-style:italic">TBD</span>'}</td>
+      <td><div class="pt-winnings ${s.winnings===0?'zero':''}">${s.winnings?'$'+s.winnings.toLocaleString():'—'}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderShootout() {
+  const bracket = document.getElementById('shootoutBracket');
+  const places = [
+    {label:'🏆 Champion',   cls:'champion', emoji:'🏆'},
+    {label:'2nd Place',     cls:'',          emoji:'🥈'},
+    {label:'3rd Place',     cls:'',          emoji:'🥉'},
+    {label:'Eliminated',    cls:'eliminated',emoji:'❌'},
+  ];
+  bracket.innerHTML = places.map((p,i) => {
+    const teamId = shootoutOrder[i];
+    const team = teamId ? teamById(teamId) : null;
+    const owner = teamId ? ownerOf(teamId) : null;
+    const flight = teamId ? teamId[0] : null;
+    const fc = flight ? FLIGHT_COLORS[flight] : 'rgba(255,255,255,.2)';
+    return `<div class="sb-card ${p.cls}">
+      <div class="sb-place">${p.label}</div>
+      <div class="sb-trophy">${p.emoji}</div>
+      ${team ? `
+        <div class="sb-team">${team.p1}<br>& ${team.p2}</div>
+        <div class="sb-owner">${owner?owner.name:'—'}</div>
+        <div class="sb-flight" style="color:${fc};border:1px solid ${fc}40;background:${fc}15">Flight ${flight}</div>
+      ` : `<div class="sb-team" style="color:rgba(248,243,232,.2);font-size:14px">TBD</div>`}
+    </div>`;
+  }).join('');
+}
+
+function renderPayouts() {
+  const body = document.getElementById('payoutBody');
+  if(shootoutOrder.length === 0){
+    body.innerHTML = `<tr><td colspan="5" style="color:rgba(248,243,232,.25);font-style:italic;text-align:center;padding:20px">Shootout results pending</td></tr>`;
+    return;
+  }
+  const payouts = [
+    {place:'🥇 1st', pct:'60%', amount:Math.round(TOTAL_POT*.6), teamId:shootoutOrder[0]},
+    {place:'🥈 2nd', pct:'30%', amount:Math.round(TOTAL_POT*.3), teamId:shootoutOrder[1]},
+    {place:'🥉 3rd', pct:'10%', amount:Math.round(TOTAL_POT*.1), teamId:shootoutOrder[2]},
+  ];
+  body.innerHTML = payouts.map((p,i) => {
+    const team = teamById(p.teamId);
+    const owner = ownerOf(p.teamId);
+    const rowClass = ['gold-row','silver-row','bronze-row'][i];
+    return `<tr class="${rowClass}">
+      <td><div class="rank">${p.place}</div></td>
+      <td><div class="owner-name">${owner?owner.name:'—'}</div></td>
+      <td>${team?`${team.p1} & ${team.p2}`:'—'}</td>
+      <td><div class="pct">${p.pct}</div></td>
+      <td><div class="amount">$${p.amount.toLocaleString()}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+function populateMatchSelect() {
+  const sel = document.getElementById('matchSelect');
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">Select match...</option>';
+  ['A','B','C','D'].forEach(f => {
+    const grp = document.createElement('optgroup');
+    grp.label = `Flight ${f}`;
+    ALL_MATCHES[f].forEach(m => {
+      const t1 = teamById(m.team1);
+      const t2 = teamById(m.team2);
+      const s = scores[m.id];
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = `${t1.p1.split(' ')[1]} & ${t1.p2.split(' ')[1]} vs ${t2.p1.split(' ')[1]} & ${t2.p2.split(' ')[1]} ${s?'✓':''}`;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  });
+  sel.value = currentVal;
+}
+
+// ── PAGE NAV ─────────────────────────────────────────────────
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  if(page==='shootout') renderShootout(), renderPayouts();
+}
+
+function showFlight(f, el) {
+  document.querySelectorAll('.match-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderMatches(f);
+}
+
+// Admin toggle - triple click logo
+let clickCount=0;
+document.querySelector('.logo-main').addEventListener('click',()=>{
+  clickCount++;
+  if(clickCount>=3){
+    isAdmin=!isAdmin;
+    document.getElementById('adminSection').style.display=isAdmin?'block':'none';
+    document.getElementById('shootoutAdmin').style.display=isAdmin?'block':'none';
+    showToast(isAdmin?'Admin Mode On':'Admin Mode Off', isAdmin?'Score entry unlocked':'Score entry locked');
+    clickCount=0;
+  }
+  setTimeout(()=>clickCount=0,1000);
+});
+
+// Shootout nav fix
+document.querySelectorAll('.nav-tab').forEach(tab=>{
+  tab.addEventListener('click',function(e){
+    if(this.href && this.href.endsWith('#') && this.textContent.includes('Shootout')){
+      e.preventDefault();
+      showPage('shootout');
+      document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+      this.classList.add('active');
+    }
+  });
+});
+
+let toastTimeout;
+function showToast(title,msg){
+  const t=document.getElementById('toast');
+  document.getElementById('toastTitle').textContent=title;
+  document.getElementById('toastMsg').textContent=msg;
+  t.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout=setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+renderAll();
+renderShootout();
+renderPayouts();
+</script>
+</body>
+</html>

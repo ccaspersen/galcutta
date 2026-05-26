@@ -8,6 +8,7 @@
 
 <!-- Firebase -->
 <script type="module">
+window._moduleLoaded = true;
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -99,7 +100,7 @@ function showToast(title, msg, duration=3500) {
   clearTimeout(window._toastTO);
   window._toastTO=setTimeout(()=>t.classList.remove('show'),duration);
 }
-function show(id){ document.getElementById(id).style.display=''; }
+function show(id){ var el=document.getElementById(id); el.style.display=(id==='authScreen')?'flex':'block'; }
 function hide(id){ document.getElementById(id).style.display='none'; }
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -267,6 +268,35 @@ window.placeBid = async function() {
       bidderId: currentUser.uid,
       at: serverTimestamp()
     });
+  } catch(e) { showToast("Bid failed", e.message); }
+}
+
+
+window.placeManualBid = async function() {
+  const input = document.getElementById('manualBidInput');
+  if (!input) return;
+  const amount = parseInt(input.value);
+  if (!amount || amount <= 0) { showToast("Invalid Amount", "Please enter a valid dollar amount."); return; }
+  if (!currentUser || !auctionState || auctionState.status !== 'active') return;
+  const { currentBid, currentBidderId } = auctionState;
+  if (currentBidderId === currentUser.uid) { showToast("You're already winning!", "Wait for someone else to bid."); return; }
+  if (amount <= currentBid) { showToast("Too Low!", "Must be more than $" + currentBid); return; }
+  try {
+    await updateDoc(doc(db,'auction','state'), {
+      currentBid: amount,
+      currentBidder: currentUser.displayName || currentUser.email,
+      currentBidderId: currentUser.uid,
+      timerEnd: Date.now() + TIMER_SEC*1000
+    });
+    const bidRef = doc(collection(db,'auction','state','bids'));
+    await setDoc(bidRef, {
+      teamId: auctionState.currentTeamId,
+      amount,
+      bidder: currentUser.displayName || currentUser.email,
+      bidderId: currentUser.uid,
+      at: serverTimestamp()
+    });
+    input.value = '';
   } catch(e) { showToast("Bid failed", e.message); }
 }
 
@@ -621,6 +651,14 @@ main{max-width:1060px;margin:0 auto;padding:28px 16px 80px;}
 .complete-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px;text-align:left;}
 @media(max-width:580px){.complete-grid{grid-template-columns:1fr;}}
 
+
+.manual-bid-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.manual-bid-input{background:rgba(0,0,0,.3);border:1px solid rgba(201,168,76,.28);color:var(--cream);font-family:'Cormorant Garamond',serif;font-size:17px;padding:10px 14px;border-radius:3px;width:180px;outline:none;transition:border-color .2s;}
+.manual-bid-input:focus{border-color:var(--gold);}
+.manual-bid-input::placeholder{color:rgba(248,243,232,.28);}
+.manual-bid-btn{background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.4);color:var(--gold);font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.2em;padding:10px 20px;border-radius:3px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.manual-bid-btn:hover{background:rgba(201,168,76,.25);}
+
 /* ── TOAST ── */
 .toast{position:fixed;bottom:22px;right:22px;background:var(--green-mid);border:1px solid var(--gold);border-left:4px solid var(--gold);color:var(--cream);padding:12px 16px;border-radius:3px;font-size:13px;max-width:260px;transform:translateX(130%);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.4);}
 .toast.show{transform:translateX(0);}
@@ -637,7 +675,7 @@ main{max-width:1060px;margin:0 auto;padding:28px 16px 80px;}
 </header>
 
 <!-- ── AUTH SCREEN ── -->
-<div id="authScreen">
+<div id="authScreen" style="min-height:calc(100vh - 140px);display:flex;align-items:center;justify-content:center;padding:40px 20px;">
   <!-- REGISTER -->
   <div class="auth-card" id="authRegister" style="display:none">
     <h2>Join Galcutta</h2>
@@ -662,7 +700,7 @@ main{max-width:1060px;margin:0 auto;padding:28px 16px 80px;}
 </div>
 
 <!-- ── APP SCREEN ── -->
-<div id="appScreen">
+<div id="appScreen" style="display:none">
   <div class="user-bar">
     <div class="ub-name">Signed in as <strong id="userName"></strong></div>
     <div class="ub-right">
@@ -710,3 +748,21 @@ main{max-width:1060px;margin:0 auto;padding:28px 16px 80px;}
 
 </body>
 </html>
+<script>
+// Proxy functions for HTML button onclick handlers
+function doLogin() { if(window.doLogin) window.doLogin(); }
+function doRegister() { if(window.doRegister) window.doRegister(); }
+function showLogin() { if(window.showLogin) window.showLogin(); }
+function showRegister() { if(window.showRegister) window.showRegister(); }
+function placeBid(a) { if(window.placeBid) window.placeBid(a); }
+function placeQuickBid(a) { if(window.placeQuickBid) window.placeQuickBid(a); }
+function activateHost() { if(window.activateHost) window.activateHost(); }
+function hostInitAuction() { if(window.hostInitAuction) window.hostInitAuction(); }
+function hostNextTeam() { if(window.hostNextTeam) window.hostNextTeam(); }
+function hostResetTimer() { if(window.hostResetTimer) window.hostResetTimer(); }
+function hostSkipTeam() { if(window.hostSkipTeam) window.hostSkipTeam(); }
+function doLogout() { if(window.doLogout) window.doLogout(); }
+</script>
+<script>
+function placeManualBid() { if(window.placeManualBid) window.placeManualBid(); }
+</script>
